@@ -10,6 +10,10 @@ text format.
 code on this machine. Nothing is estimated. Precision, recall, and mAP are **not
 reported** because the sample clip has no ground-truth labels.
 
+**Live demo:** [dorian-smartcity-vision.fly.dev](https://dorian-smartcity-vision.fly.dev)
+runs YOLOv8 on the sample clip when you click Analyze. GitHub Pages is a static
+replay only.
+
 ![Tracked car with a persistent ID](docs/images/phase2_tracked_frame.png)
 
 ## Quickstart
@@ -38,7 +42,7 @@ The first run downloads `yolov8n.pt` (6.2 MB) into `models/`. Outputs land in
 | `events.csv` / `traffic_metrics.csv` / `summary.json` | Pandas export of that run |
 
 ```bash
-pytest                    # 147 tests, ~2 s, no GPU required
+pytest                    # 150 tests, ~2 s, no GPU required
 ruff check . && ruff format --check .
 python -m uvicorn smartcity_vision.api.app:app --reload   # API + /docs
 python scripts/benchmark_onnx.py                          # PyTorch vs ONNX, real numbers
@@ -185,7 +189,7 @@ camera — nothing in the code hardcodes them.
 ## Testing
 
 ```bash
-pytest          # 147 tests
+pytest          # 150 tests
 ruff check .
 ruff format --check .
 ```
@@ -210,13 +214,21 @@ not a claim that it has been used in an incident.
 GitHub Actions (`.github/workflows/ci.yml`) runs pytest, ruff, and a Docker
 build on every push/PR.
 
+The public live demo is `Dockerfile.demo` on Fly.io (`fly.toml`, region `yyz`).
+It serves `/`, runs one analysis at a time, and transcodes the OpenCV writer
+output to H.264 so the browser can play it. The machine auto-stops when idle.
+
+```bash
+fly deploy
+```
+
 ### Deploying this to Cloud Run / GKE (config only)
 
 A Cloud Run service would wrap the same `uvicorn` image, mount a volume (or
 GCS fuse) for `data/` and `models/`, and point Prometheus at
 `/metrics/prometheus`. GKE would add an HPA on that latency histogram and a
-dedicated node pool if you move inference to a GPU. Neither has been deployed
-from this repository.
+dedicated node pool if you move inference to a GPU. The Fly live demo is the
+deployment that has actually been stood up from this repository.
 
 ## Custom training
 

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SmartCity Vision — live demo</title>
+  <meta name="description" content="Click Analyze to run YOLOv8 + ByteTrack on the server. Numbers come from that run." />
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #141a22;
+      --line: #243041;
+      --text: #e6edf3;
+      --muted: #8b9bb4;
+      --accent: #58a6ff;
+      --good: #3fb950;
+      --warn: #d29922;
+      --bad: #f85149;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, #1a2740 0%, var(--bg) 55%);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    main { max-width: 980px; margin: 0 auto; padding: 40px 20px 72px; }
+    .kicker { color: var(--accent); font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; }
+    h1 { font-size: clamp(28px, 4vw, 42px); margin: 8px 0 12px; letter-spacing: -0.03em; }
+    .lede { color: var(--muted); max-width: 62ch; margin: 0 0 22px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 22px; }
+    button, a.btn {
+      display: inline-block;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 14px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      text-decoration: none;
+      font-family: inherit;
+    }
+    button.primary, a.primary { background: var(--accent); color: #041018; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    a.ghost, button.ghost { background: transparent; color: var(--text); border-color: var(--line); }
+    .status { color: var(--muted); font-size: 14px; min-height: 1.5em; }
+    .status.running { color: var(--warn); }
+    .status.done { color: var(--good); }
+    .status.error { color: var(--bad); }
+    .pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 720px) { .pair { grid-template-columns: 1fr; } }
+    .stage {
+      background: #000;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      min-height: 180px;
+    }
+    .stage video { display: block; width: 100%; height: auto; background: #000; }
+    .stage .empty {
+      color: var(--muted);
+      padding: 48px 20px;
+      text-align: center;
+      font-size: 14px;
+    }
+    .caption { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 24px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .card .label { color: var(--muted); font-size: 12px; }
+    .card .value { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; }
+    .card .note { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    h2 { margin: 36px 0 10px; font-size: 20px; }
+    ul { color: var(--muted); padding-left: 18px; }
+    code { color: var(--accent); font-size: 13px; }
+    footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
+    footer a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="kicker">Live server run · not a GIF</p>
+    <h1>SmartCity Vision</h1>
+    <p class="lede">
+      Click Analyze to run YOLOv8 + ByteTrack on this machine. The annotated
+      video and the numbers below come from that request. Nothing is mocked.
+    </p>
+    <div class="actions">
+      <button id="analyze" class="primary" type="button">Analyze sample clip</button>
+      <a class="btn ghost" href="https://github.com/Dorianbansoodeb/smartcity-vision">GitHub</a>
+      <span id="status" class="status">Checking the server…</span>
+    </div>
+
+    <div class="pair">
+      <div>
+        <div class="stage">
+          <video id="source" controls muted playsinline loop></video>
+        </div>
+        <p class="caption">Source: Intel IoT parking-lot clip (H.264, 768×432, 12 fps).</p>
+      </div>
+      <div>
+        <div class="stage" id="output-stage">
+          <p class="empty" id="output-empty">Annotated output appears here after a run.</p>
+          <video id="output" controls playsinline hidden></video>
+        </div>
+        <p class="caption">Boxes, track IDs, lines, zones, HUD — written after inference, then transcoded to H.264.</p>
+      </div>
+    </div>
+
+    <div class="grid" id="stats" hidden></div>
+
+    <h2>What you are looking at</h2>
+    <ul>
+      <li>The server processes the first 64 frames of the sample clip so a request finishes while you wait.</li>
+      <li>Unique counts are keyed on track identity, not raw boxes. If a person is seen on 20 frames, that is one object.</li>
+      <li>Privacy redaction runs before the video is written. Haar cascades are not in this OpenCV build; fallback regions are used.</li>
+      <li>The first click after idle can take about a minute: Fly stops the machine when nobody is using it, then the model loads.</li>
+      <li>Precision, recall, and mAP are not quoted — this clip has no ground-truth labels.</li>
+    </ul>
+
+    <footer>
+      Run id appears after Analyze ·
+      <a href="https://github.com/Dorianbansoodeb/smartcity-vision/blob/main/MODEL_CARD.md">Model card</a>
+    </footer>
+  </main>
+  <script>
+    const statusEl = document.getElementById("status");
+    const analyzeBtn = document.getElementById("analyze");
+    const sourceEl = document.getElementById("source");
+    const outputEl = document.getElementById("output");
+    const outputEmpty = document.getElementById("output-empty");
+    const statsEl = document.getElementById("stats");
+    let pollTimer = null;
+
+    sourceEl.src = "/demo/source";
+
+    function setStatus(text, kind) {
+      statusEl.textContent = text;
+      statusEl.className = "status" + (kind ? " " + kind : "");
+    }
+
+    function card(label, value, note) {
+      const wrap = document.createElement("div");
+      wrap.className = "card";
+      wrap.innerHTML =
+        '<div class="label"></div><div class="value"></div><div class="note"></div>';
+      wrap.children[0].textContent = label;
+      wrap.children[1].textContent = value;
+      wrap.children[2].textContent = note || "";
+      return wrap;
+    }
+
+    function formatCounts(counts) {
+      if (!counts || !Object.keys(counts).length) return "none yet";
+      return Object.entries(counts).map(([name, n]) => n + " " + name).join(" · ");
+    }
+
+    function renderStats(stats) {
+      statsEl.hidden = !stats;
+      statsEl.replaceChildren();
+      if (!stats) return;
+      const unique = stats.unique_counts || {};
+      const crossings = stats.crossings || {};
+      const density = stats.density || {};
+      statsEl.append(
+        card("Detections", String(stats.total_detections ?? "—"), stats.frames_processed + " frames processed"),
+        card("Unique objects", String(unique.total ?? "—"), formatCounts(unique.counts_by_class)),
+        card("Line crossings", String(crossings.total ?? "—"), formatCounts(crossings.counts_by_line)),
+        card("Throughput", (stats.pipeline_fps ?? "—") + " fps", (stats.avg_inference_ms ?? "—") + " ms avg · " + (stats.device || "cpu")),
+        card("Peak congestion", density.peak_congestion || "—", "from this run, not a stored average"),
+        card("Run id", (stats.run_id || "—").slice(0, 12), stats.run_id || "")
+      );
+    }
+
+    function showOutput(hasOutput) {
+      if (!hasOutput) {
+        outputEl.hidden = true;
+        outputEmpty.hidden = false;
+        return;
+      }
+      outputEmpty.hidden = true;
+      outputEl.hidden = false;
+      outputEl.src = "/demo/output?t=" + Date.now();
+    }
+
+    function applyStatus(data) {
+      setStatus(data.message, data.status);
+      analyzeBtn.disabled = data.status === "running";
+      if (data.status === "done") {
+        showOutput(data.has_output);
+        renderStats(data.stats);
+      } else if (data.status === "error") {
+        showOutput(false);
+      }
+      if (data.status === "running") startPolling();
+      else stopPolling();
+    }
+
+    function startPolling() {
+      if (pollTimer) return;
+      pollTimer = setInterval(refreshStatus, 1500);
+    }
+
+    function stopPolling() {
+      if (!pollTimer) return;
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+
+    async function refreshStatus() {
+      const response = await fetch("/demo/status");
+      applyStatus(await response.json());
+    }
+
+    analyzeBtn.addEventListener("click", async () => {
+      analyzeBtn.disabled = true;
+      setStatus("Starting analysis…", "running");
+      const response = await fetch("/demo/analyze", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) {
+        setStatus(data.detail || "Could not start analysis", "error");
+        analyzeBtn.disabled = false;
+        return;
+      }
+      applyStatus(data);
+    });
+
+    refreshStatus().catch(() => setStatus("Could not reach the API.", "error"));
+  </script>
+</body>
+</html>

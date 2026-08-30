@@ -72,8 +72,8 @@
       came from running the pipeline — detections, unique counts, crossings, and latency.
     </p>
     <div class="actions">
-      <a class="btn primary" href="https://github.com/Dorianbansoodeb/smartcity-vision">GitHub repo</a>
-      <a class="btn ghost" href="https://github.com/Dorianbansoodeb/smartcity-vision#quickstart">Run it locally</a>
+      <a class="btn primary" href="https://dorian-smartcity-vision.fly.dev">Live demo (runs YOLO)</a>
+      <a class="btn ghost" href="https://github.com/Dorianbansoodeb/smartcity-vision">GitHub repo</a>
     </div>
 
     <div class="stage">
@@ -115,12 +115,12 @@
       <li>ONNX Runtime was slower on the mean than PyTorch on CPU (39.7 vs 29.7 ms) and tighter on the p95. That measurement is in the repo.</li>
     </ul>
 
-    <h2>This is a static replay</h2>
+    <h2>This page is a static replay</h2>
     <p class="lede">
-      GitHub Pages cannot run YOLO in your browser. The live analyzer is
-      <code>python scripts/run_video.py</code> in the repo, or the FastAPI app on
-      <code>localhost:8000/docs</code>. Precision, recall, and mAP are not quoted —
-      this clip has no ground-truth labels.
+      GitHub Pages cannot run YOLO. The live analyzer is
+      <a href="https://dorian-smartcity-vision.fly.dev" style="color: var(--accent)">dorian-smartcity-vision.fly.dev</a>
+      — click Analyze there and the server runs the model. Precision, recall, and
+      mAP are not quoted: this clip has no ground-truth labels.
     </p>
 
     <footer>

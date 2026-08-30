@@ -1,0 +1,14 @@
+# Slim install for the public live demo. Torch CPU + headless OpenCV.
+# Full project extras (mlflow, onnxruntime, GUI OpenCV) stay out of this image.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+ultralytics>=8.3.0
+lap>=0.5.12
+opencv-python-headless>=4.10.0
+numpy>=1.26.0
+pandas>=2.2.0
+pydantic>=2.8.0
+PyYAML>=6.0.1
+fastapi>=0.115.0
+uvicorn>=0.30.0
+prometheus-client>=0.20.0
