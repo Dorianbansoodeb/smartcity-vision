@@ -84,7 +84,7 @@ class FrameRenderer:
         return image
 
     def draw_hud(self, image: np.ndarray, lines: Sequence[str]) -> np.ndarray:
-        """Draw a translucent status panel in the top-left corner.
+        """Draw a translucent status panel in the configured corner.
 
         Args:
             image: BGR frame, modified in place.
@@ -104,19 +104,24 @@ class FrameRenderer:
 
         panel_width = max(width for width, _ in sizes) + 2 * _HUD_PADDING
         panel_height = len(lines) * line_height + (len(lines) - 1) * line_gap + 2 * _HUD_PADDING
-        top_left = (_HUD_MARGIN, _HUD_MARGIN)
-        bottom_right = (_HUD_MARGIN + panel_width, _HUD_MARGIN + panel_height)
+        origin_x, origin_y = self._hud_origin(image.shape[:2], panel_width, panel_height)
 
         overlay = image.copy()
-        cv2.rectangle(overlay, top_left, bottom_right, _HUD_BACKGROUND, cv2.FILLED)
+        cv2.rectangle(
+            overlay,
+            (origin_x, origin_y),
+            (origin_x + panel_width, origin_y + panel_height),
+            _HUD_BACKGROUND,
+            cv2.FILLED,
+        )
         cv2.addWeighted(overlay, _HUD_ALPHA, image, 1.0 - _HUD_ALPHA, 0, dst=image)
 
-        baseline = _HUD_MARGIN + _HUD_PADDING + line_height
+        baseline = origin_y + _HUD_PADDING + line_height
         for line in lines:
             cv2.putText(
                 image,
                 line,
-                (_HUD_MARGIN + _HUD_PADDING, baseline),
+                (origin_x + _HUD_PADDING, baseline),
                 _FONT,
                 scale,
                 _TEXT_COLOR,
@@ -126,11 +131,32 @@ class FrameRenderer:
             baseline += line_height + line_gap
         return image
 
+    def _hud_origin(
+        self,
+        frame_shape: tuple[int, int],
+        panel_width: int,
+        panel_height: int,
+    ) -> tuple[int, int]:
+        """Return the panel's top-left pixel for the configured corner."""
+        height, width = frame_shape
+        right = max(_HUD_MARGIN, width - panel_width - _HUD_MARGIN)
+        bottom = max(_HUD_MARGIN, height - panel_height - _HUD_MARGIN)
+        corners = {
+            "top-left": (_HUD_MARGIN, _HUD_MARGIN),
+            "top-right": (right, _HUD_MARGIN),
+            "bottom-left": (_HUD_MARGIN, bottom),
+            "bottom-right": (right, bottom),
+        }
+        return corners[self._config.hud_position]
+
     def _label_for(self, detection: Detection) -> str:
-        """Build the box label text for a detection."""
+        """Build the box label text: class, optional track ID, optional confidence."""
+        parts = [detection.class_name]
+        if self._config.show_track_ids and detection.track_id is not None:
+            parts.append(f"#{detection.track_id}")
         if self._config.show_confidence:
-            return f"{detection.class_name} {detection.confidence:.2f}"
-        return detection.class_name
+            parts.append(f"{detection.confidence:.2f}")
+        return " ".join(parts)
 
     def _draw_label(
         self,

@@ -8,54 +8,17 @@ inference.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pytest
 import torch
 
+from helpers import install_fake_yolo
 from smartcity_vision.detection import detector as detector_module
 from smartcity_vision.detection.detector import YoloDetector, resolve_device
 from smartcity_vision.exceptions import ConfigError, DetectionError
 from smartcity_vision.utils.config import ModelConfig
 from smartcity_vision.video.source import Frame
-
-COCO_SUBSET = {0: "person", 1: "bicycle", 2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
-
-
-class FakeBoxes:
-    """Minimal stand-in for ``ultralytics.engine.results.Boxes``."""
-
-    def __init__(self, rows: list[tuple[float, float, float, float, float, int]]) -> None:
-        self.xyxy = torch.tensor([row[:4] for row in rows], dtype=torch.float32)
-        self.conf = torch.tensor([row[4] for row in rows], dtype=torch.float32)
-        self.cls = torch.tensor([row[5] for row in rows], dtype=torch.float32)
-
-    def __len__(self) -> int:
-        return int(self.xyxy.shape[0])
-
-
-class FakeResult:
-    def __init__(self, boxes: FakeBoxes | None) -> None:
-        self.boxes = boxes
-
-
-class FakeYolo:
-    """Records predict calls and returns canned results."""
-
-    def __init__(self, weights: str, rows: list | None = None, raises: bool = False) -> None:
-        self.weights = weights
-        self.names = dict(COCO_SUBSET)
-        self.ckpt_path = ""
-        self.predict_kwargs: list[dict[str, Any]] = []
-        self._rows = rows if rows is not None else []
-        self._raises = raises
-
-    def predict(self, **kwargs: Any) -> list[FakeResult]:
-        self.predict_kwargs.append(kwargs)
-        if self._raises:
-            raise RuntimeError("CUDA out of memory")
-        return [FakeResult(FakeBoxes(self._rows) if self._rows else None)]
 
 
 @pytest.fixture
@@ -63,23 +26,6 @@ def weights_file(tmp_path: Path) -> Path:
     path = tmp_path / "yolov8n.pt"
     path.write_bytes(b"not-a-real-checkpoint")
     return path
-
-
-def install_fake_yolo(
-    monkeypatch: pytest.MonkeyPatch,
-    rows: list | None = None,
-    raises: bool = False,
-) -> list[FakeYolo]:
-    """Replace the YOLO class with a stub and return the list of instances built."""
-    built: list[FakeYolo] = []
-
-    def factory(weights: str) -> FakeYolo:
-        model = FakeYolo(weights, rows=rows, raises=raises)
-        built.append(model)
-        return model
-
-    monkeypatch.setattr(detector_module, "YOLO", factory)
-    return built
 
 
 def frame(index: int = 3, timestamp: float = 0.5) -> Frame:

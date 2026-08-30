@@ -37,12 +37,16 @@ class Detection:
         class_name: Human-readable class name, e.g. ``"car"``.
         confidence: Detection confidence in ``[0, 1]``.
         bbox: Pixel bounding box as ``(x1, y1, x2, y2)``.
+        track_id: Identity assigned by the tracker, stable across frames.
+            ``None`` when running detection without tracking, or for a detection
+            the tracker has not yet confirmed into a track.
     """
 
     class_id: int
     class_name: str
     confidence: float
     bbox: BBox
+    track_id: int | None = None
 
     @property
     def center(self) -> tuple[float, float]:
@@ -90,6 +94,11 @@ class DetectionResult:
     def __len__(self) -> int:
         """Number of detections in this frame."""
         return len(self.detections)
+
+    @property
+    def tracked(self) -> tuple[Detection, ...]:
+        """Detections that carry a track identity."""
+        return tuple(item for item in self.detections if item.track_id is not None)
 
 
 def resolve_device(requested: str) -> str:
@@ -180,12 +189,11 @@ class YoloDetector:
         Returns:
             The warmup inference time in milliseconds.
         """
-        blank = Frame(
-            index=-1,
-            timestamp=0.0,
-            image=np.zeros((height, width, 3), dtype=np.uint8),
-        )
-        elapsed_ms = self.detect(blank).inference_ms
+        blank = np.zeros((height, width, 3), dtype=np.uint8)
+        started = perf_counter()
+        # Deliberately plain prediction: a warmup frame must not enter tracker state.
+        self._model.predict(source=blank, **self._inference_kwargs())
+        elapsed_ms = (perf_counter() - started) * 1000.0
         logger.info("Warmup inference took %.1f ms on %s", elapsed_ms, self._device)
         return elapsed_ms
 
@@ -204,16 +212,7 @@ class YoloDetector:
         """
         started = perf_counter()
         try:
-            results = self._model.predict(
-                source=frame.image,
-                conf=self._config.confidence_threshold,
-                iou=self._config.iou_threshold,
-                imgsz=self._config.image_size,
-                max_det=self._config.max_detections,
-                classes=list(self._target_class_ids),
-                device=self._device,
-                verbose=False,
-            )
+            results = self._run(frame.image)
         except Exception as exc:  # noqa: BLE001 - surfaced as a package error
             raise DetectionError(f"Inference failed on frame {frame.index}: {exc}") from exc
         inference_ms = (perf_counter() - started) * 1000.0
@@ -225,6 +224,26 @@ class YoloDetector:
             detections=detections,
             inference_ms=inference_ms,
         )
+
+    def _run(self, image: np.ndarray) -> list:
+        """Invoke the model on one image.
+
+        Overridden by :class:`~smartcity_vision.detection.tracker.YoloTracker` to
+        run tracking instead of stateless prediction.
+        """
+        return self._model.predict(source=image, **self._inference_kwargs())
+
+    def _inference_kwargs(self) -> dict[str, object]:
+        """Keyword arguments shared by prediction and tracking calls."""
+        return {
+            "conf": self._config.confidence_threshold,
+            "iou": self._config.iou_threshold,
+            "imgsz": self._config.image_size,
+            "max_det": self._config.max_detections,
+            "classes": list(self._target_class_ids),
+            "device": self._device,
+            "verbose": False,
+        }
 
     def _parse_results(self, results: list) -> tuple[Detection, ...]:
         """Convert Ultralytics results into :class:`Detection` objects."""
@@ -238,6 +257,14 @@ class YoloDetector:
         xyxy = np.asarray(boxes.xyxy.cpu(), dtype=float)
         confidences = np.asarray(boxes.conf.cpu(), dtype=float)
         class_ids = np.asarray(boxes.cls.cpu(), dtype=int)
+        # boxes.id is absent for plain prediction and None until the tracker
+        # confirms its first track, so both cases collapse to "no identities".
+        raw_ids = getattr(boxes, "id", None)
+        track_ids = (
+            [None] * len(class_ids)
+            if raw_ids is None
+            else [int(value) for value in np.asarray(raw_ids.cpu(), dtype=int)]
+        )
 
         return tuple(
             Detection(
@@ -245,8 +272,11 @@ class YoloDetector:
                 class_name=self._class_names.get(int(class_id), str(class_id)),
                 confidence=float(confidence),
                 bbox=(float(box[0]), float(box[1]), float(box[2]), float(box[3])),
+                track_id=track_id,
             )
-            for box, confidence, class_id in zip(xyxy, confidences, class_ids, strict=True)
+            for box, confidence, class_id, track_id in zip(
+                xyxy, confidences, class_ids, track_ids, strict=True
+            )
         )
 
     def _load_model(self, weights: Path) -> YOLO:

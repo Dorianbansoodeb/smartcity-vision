@@ -17,6 +17,7 @@ from typing import Any
 import cv2
 import numpy as np
 
+from smartcity_vision.analytics.counter import CountingSummary, UniqueObjectCounter
 from smartcity_vision.detection.detector import DetectionResult, YoloDetector
 from smartcity_vision.exceptions import VideoSourceError
 from smartcity_vision.utils.config import AppConfig
@@ -63,6 +64,8 @@ class ProcessingStats:
     inference_ms_samples: list[float] = field(default_factory=list, repr=False)
     output_video: Path | None = None
     device: str = "unknown"
+    tracker: str | None = None
+    counting: CountingSummary | None = None
     interrupted: bool = False
 
     @property
@@ -101,6 +104,8 @@ class ProcessingStats:
             "avg_inference_ms": round(self.avg_inference_ms, 2),
             "p95_inference_ms": round(self.p95_inference_ms, 2),
             "device": self.device,
+            "tracker": self.tracker,
+            "unique_counts": self.counting.as_dict() if self.counting else None,
             "output_video": str(self.output_video) if self.output_video else None,
             "interrupted": self.interrupted,
         }
@@ -115,20 +120,33 @@ class VideoProcessor:
         detector: YoloDetector,
         renderer: FrameRenderer | None = None,
         source: VideoSource | None = None,
+        counter: UniqueObjectCounter | None = None,
     ) -> None:
         """Initialise the pipeline.
 
         Args:
             config: Validated application configuration.
-            detector: Detector to reuse for every frame.
+            detector: Detector or tracker to reuse for every frame.
             renderer: Overlay renderer; built from config when omitted.
             source: Video source to consume; built from config when omitted.
+            counter: Unique-object counter. Omitted builds one from config when
+                tracking is enabled; without tracking there are no identities to
+                count, so counting is skipped.
         """
         self._config = config
         self._detector = detector
         self._renderer = renderer or FrameRenderer(config.visualization)
         self._source = source or create_source_from_config(config)
+        self._counter = counter or self._default_counter(config)
         self._recent_frame_durations: deque[float] = deque(maxlen=_FPS_WINDOW)
+
+    @staticmethod
+    def _default_counter(config: AppConfig) -> UniqueObjectCounter | None:
+        """Build a counter when tracking can supply identities, else ``None``."""
+        if not config.tracking.enabled:
+            logger.info("Tracking disabled; unique object counts will not be produced")
+            return None
+        return UniqueObjectCounter(config.analytics.counting)
 
     def run(self) -> ProcessingStats:
         """Process the configured source end to end.
@@ -160,6 +178,8 @@ class VideoProcessor:
 
                     frame_started = perf_counter()
                     result = self._detector.detect(frame)
+                    if self._counter is not None:
+                        self._counter.update(result)
                     annotated = self._annotate(frame, result)
 
                     if writer is None and self._config.output.write_annotated_video:
@@ -194,6 +214,9 @@ class VideoProcessor:
                     cv2.destroyAllWindows()
 
         stats.detections_by_class = dict(class_counter)
+        stats.tracker = getattr(self._detector, "tracker_name", None)
+        if self._counter is not None:
+            stats.counting = self._counter.summary()
         self._log_summary(stats)
         return stats
 
@@ -209,11 +232,19 @@ class VideoProcessor:
         lines = [
             f"Frame {frame.index}  t={frame.timestamp:.2f}s",
             f"FPS {self._rolling_fps():.1f}  ({self._detector.device})",
-            f"Objects {len(result)}",
+            f"In frame: {len(result)}",
         ]
         by_class = Counter(detection.class_name for detection in result.detections)
         if by_class:
             lines.append("  ".join(f"{name}:{count}" for name, count in sorted(by_class.items())))
+
+        if self._counter is not None:
+            summary = self._counter.summary()
+            lines.append(f"Unique total: {summary.total}")
+            if summary.counts_by_class:
+                lines.append(
+                    "  ".join(f"{name}:{count}" for name, count in summary.counts_by_class.items())
+                )
         return lines
 
     def _rolling_fps(self) -> float:
@@ -311,6 +342,19 @@ class VideoProcessor:
             stats.p95_inference_ms,
             stats.total_detections,
         )
+        if stats.counting is not None:
+            logger.info(
+                "Unique objects: %d total (%s) from %d tracks observed "
+                "(%d discarded as too short-lived, %d still unconfirmed)",
+                stats.counting.total,
+                ", ".join(
+                    f"{name} {count}" for name, count in stats.counting.counts_by_class.items()
+                )
+                or "none",
+                stats.counting.tracks_observed,
+                stats.counting.discarded_tracks,
+                stats.counting.pending_tracks,
+            )
 
 
 def _fourcc(codec: str) -> int:

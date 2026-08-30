@@ -12,6 +12,9 @@ license = { text = "MIT" }
 authors = [{ name = "Dorian Bansoodeb" }]
 dependencies = [
     "ultralytics>=8.3.0",
+    # Ultralytics pip-installs this at runtime on the first tracking call if it
+    # is missing; declaring it keeps installs reproducible and CI offline-safe.
+    "lap>=0.5.12",
     "opencv-python>=4.10.0",
     "numpy>=1.26.0",
     "pandas>=2.2.0",
@@ -30,7 +33,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "tests"]
 addopts = "-q"
 
 [tool.ruff]
@@ -47,6 +50,10 @@ ignore = [
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.ruff.lint.isort]
+# "helpers" is the shared test-double module in tests/.
+known-first-party = ["smartcity_vision", "helpers"]
 
 [tool.ruff.lint.per-file-ignores]
 # Test helpers and stubs do not need the docstring discipline of library code.

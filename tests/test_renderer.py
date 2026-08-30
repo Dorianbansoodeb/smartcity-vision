@@ -72,6 +72,21 @@ def test_label_stays_inside_the_frame_for_a_box_at_the_top_left_corner() -> None
     assert image[0:30, 0:40].any()
 
 
+def test_track_id_appears_in_the_label_only_when_present_and_enabled() -> None:
+    tracked = Detection(
+        class_id=2, class_name="car", confidence=0.87, bbox=(0, 0, 9, 9), track_id=12
+    )
+    untracked = car()
+
+    with_ids = FrameRenderer(VisualizationConfig(show_track_ids=True))
+    without_ids = FrameRenderer(VisualizationConfig(show_track_ids=False))
+
+    assert with_ids._label_for(tracked) == "car #12 0.87"  # noqa: SLF001
+    assert without_ids._label_for(tracked) == "car 0.87"  # noqa: SLF001
+    # A detector-only run has no identities, so no stray "#None" in the label.
+    assert with_ids._label_for(untracked) == "car 0.87"  # noqa: SLF001
+
+
 def test_hud_draws_text_in_the_top_left_and_can_be_disabled() -> None:
     enabled = blank()
     disabled = blank()
@@ -81,6 +96,37 @@ def test_hud_draws_text_in_the_top_left_and_can_be_disabled() -> None:
 
     assert enabled[10:60, 10:120].any()
     assert not disabled.any()
+
+
+@pytest.mark.parametrize(
+    ("position", "occupied", "empty"),
+    [
+        ("top-left", np.s_[10:40, 10:60], np.s_[160:190, 240:290]),
+        ("top-right", np.s_[10:40, 240:290], np.s_[160:190, 10:60]),
+        ("bottom-left", np.s_[160:190, 10:60], np.s_[10:40, 240:290]),
+        ("bottom-right", np.s_[160:190, 240:290], np.s_[10:40, 10:60]),
+    ],
+)
+def test_hud_is_drawn_in_the_configured_corner(
+    position: str, occupied: tuple, empty: tuple
+) -> None:
+    renderer = FrameRenderer(VisualizationConfig(hud_position=position))  # type: ignore[arg-type]
+    image = np.full((200, 300, 3), 255, dtype=np.uint8)
+
+    renderer.draw_hud(image, ["FPS 12.3", "Objects 4"])
+
+    # The translucent panel darkens its corner; the opposite corner stays white.
+    assert image[occupied].mean() < 250
+    assert image[empty].mean() == 255
+
+
+def test_hud_larger_than_the_frame_is_clamped_inside_it() -> None:
+    renderer = FrameRenderer(VisualizationConfig(hud_position="bottom-right"))
+    image = np.zeros((40, 60, 3), dtype=np.uint8)
+
+    renderer.draw_hud(image, ["a very long status line that cannot possibly fit"])
+
+    assert image.any(), "the panel must still be drawn rather than clipped away entirely"
 
 
 def test_hud_with_no_lines_leaves_the_frame_unchanged() -> None:

@@ -74,6 +74,32 @@ class ModelConfig(_Section):
         return normalised
 
 
+class TrackingConfig(_Section):
+    """Multi-object tracking settings."""
+
+    enabled: bool = True
+    # Ultralytics ships both configs; ByteTrack is faster, BoT-SORT is more
+    # robust through occlusion because it adds appearance features.
+    tracker: Literal["bytetrack.yaml", "botsort.yaml"] = "bytetrack.yaml"
+
+
+class CountingConfig(_Section):
+    """Unique-object counting settings."""
+
+    # A track must be seen this many times before it counts, which suppresses
+    # one-frame false positives from inflating the totals.
+    min_track_frames: int = Field(default=3, ge=1)
+    # Per-track bookkeeping is dropped this many frames after a track was last
+    # seen, so memory stays bounded on long or live streams.
+    forget_track_after_frames: int = Field(default=90, ge=1)
+
+
+class AnalyticsConfig(_Section):
+    """Traffic-analytics settings. Extended by later phases."""
+
+    counting: CountingConfig = Field(default_factory=CountingConfig)
+
+
 class VideoConfig(_Section):
     """Where frames come from and how many of them to process."""
 
@@ -101,7 +127,11 @@ class VisualizationConfig(_Section):
     font_scale: float = Field(default=0.5, gt=0.0)
     show_labels: bool = True
     show_confidence: bool = True
+    show_track_ids: bool = True
     show_hud: bool = True
+    # No corner is universally free of traffic, so where the panel sits is a
+    # per-camera decision rather than something to hardcode.
+    hud_position: Literal["top-left", "top-right", "bottom-left", "bottom-right"] = "top-left"
     class_colors: dict[str, tuple[int, int, int]] = Field(default_factory=dict)
 
     @field_validator("class_colors")
@@ -126,6 +156,8 @@ class AppConfig(_Section):
     """Root configuration object for a SmartCity Vision run."""
 
     model: ModelConfig = Field(default_factory=ModelConfig)
+    tracking: TrackingConfig = Field(default_factory=TrackingConfig)
+    analytics: AnalyticsConfig = Field(default_factory=AnalyticsConfig)
     video: VideoConfig = Field(default_factory=VideoConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
     visualization: VisualizationConfig = Field(default_factory=VisualizationConfig)
@@ -252,10 +284,13 @@ def _format_validation_error(exc: ValidationError) -> str:
 __all__ = [
     "DEFAULT_CONFIG_PATH",
     "DEFAULT_TARGET_CLASSES",
+    "AnalyticsConfig",
     "AppConfig",
+    "CountingConfig",
     "LoggingConfig",
     "ModelConfig",
     "OutputConfig",
+    "TrackingConfig",
     "VideoConfig",
     "VisualizationConfig",
     "load_config",

@@ -15,6 +15,7 @@ from typing import Any
 
 from smartcity_vision import __version__
 from smartcity_vision.detection.detector import YoloDetector
+from smartcity_vision.detection.tracker import YoloTracker
 from smartcity_vision.exceptions import SmartCityVisionError
 from smartcity_vision.utils.config import AppConfig, load_config
 from smartcity_vision.utils.logging import get_logger, setup_logging
@@ -63,6 +64,17 @@ def build_parser(description: str, default_source: str | None = None) -> argpars
     parser.add_argument("--iou", type=float, default=None, help="NMS IoU threshold")
     parser.add_argument("--imgsz", type=int, default=None, help="Inference image size")
     parser.add_argument(
+        "--tracker",
+        choices=["bytetrack.yaml", "botsort.yaml"],
+        default=None,
+        help="Tracking algorithm (default: bytetrack.yaml)",
+    )
+    parser.add_argument(
+        "--no-tracking",
+        action="store_true",
+        help="Run stateless detection only; disables unique object counting",
+    )
+    parser.add_argument(
         "--frame-skip",
         type=int,
         default=None,
@@ -97,6 +109,7 @@ def build_parser(description: str, default_source: str | None = None) -> argpars
 def config_from_args(args: argparse.Namespace) -> AppConfig:
     """Turn parsed arguments into a validated :class:`AppConfig`."""
     model: dict[str, Any] = {}
+    tracking: dict[str, Any] = {}
     video: dict[str, Any] = {}
     output: dict[str, Any] = {}
     logging_section: dict[str, Any] = {}
@@ -111,6 +124,11 @@ def config_from_args(args: argparse.Namespace) -> AppConfig:
         model["iou_threshold"] = args.iou
     if args.imgsz is not None:
         model["image_size"] = args.imgsz
+
+    if args.tracker is not None:
+        tracking["tracker"] = args.tracker
+    if args.no_tracking:
+        tracking["enabled"] = False
 
     if args.input is not None:
         video["source"] = str(args.input)
@@ -135,6 +153,7 @@ def config_from_args(args: argparse.Namespace) -> AppConfig:
         section: values
         for section, values in (
             ("model", model),
+            ("tracking", tracking),
             ("video", video),
             ("output", output),
             ("logging", logging_section),
@@ -156,7 +175,11 @@ def run(config: AppConfig) -> ProcessingStats:
     # Build the source first: a bad path or unreachable stream should fail before
     # spending seconds loading model weights.
     source = create_source_from_config(config)
-    detector = YoloDetector(config.model)
+    detector = (
+        YoloTracker(config.model, config.tracking)
+        if config.tracking.enabled
+        else YoloDetector(config.model)
+    )
     stats = VideoProcessor(config, detector, source=source).run()
     _write_summary(config, stats)
     return stats

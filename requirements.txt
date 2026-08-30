@@ -2,6 +2,9 @@
 # Later phases add: fastapi, uvicorn, sqlalchemy, mlflow, prometheus-client, onnxruntime.
 
 ultralytics>=8.3.0        # YOLOv8 detection/tracking; pulls in torch + torchvision
+lap>=0.5.12               # linear assignment for ByteTrack/BoT-SORT; declared
+                          # explicitly because Ultralytics otherwise pip-installs
+                          # it at runtime on the first tracking call
 opencv-python>=4.10.0     # video I/O, geometry, drawing
 numpy>=1.26.0
 pandas>=2.2.0             # analytics/reporting (Phase 5)

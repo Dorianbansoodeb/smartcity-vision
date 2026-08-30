@@ -28,6 +28,23 @@ model:
     - bicycle
     - person
 
+tracking:
+  # Disabling this falls back to stateless per-frame detection, which also
+  # disables unique counting: without identities there is nothing to count once.
+  enabled: true
+  # bytetrack.yaml is faster; botsort.yaml adds appearance features and holds
+  # identities better through occlusion.
+  tracker: bytetrack.yaml
+
+analytics:
+  counting:
+    # Observations required before a track counts, so one-frame false positives
+    # do not inflate the totals.
+    min_track_frames: 3
+    # Per-track bookkeeping is dropped this long after a track disappears,
+    # keeping memory bounded on long or live streams.
+    forget_track_after_frames: 90
+
 video:
   # File path, webcam index ("0"), or stream URL ("rtsp://host/stream").
   source: data/input/traffic.mp4
@@ -48,7 +65,11 @@ visualization:
   font_scale: 0.5
   show_labels: true
   show_confidence: true
+  show_track_ids: true
   show_hud: true
+  # Bottom-left is empty tarmac in the sample clip; vehicles enter top-left and
+  # would otherwise be hidden behind the panel. Retune per camera.
+  hud_position: bottom-left
   # Optional per-class BGR overrides; unlisted classes get a stable hashed colour.
   class_colors: {}
 
