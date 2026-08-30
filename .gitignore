@@ -29,6 +29,8 @@ data/input/*
 !data/input/.gitkeep
 data/output/*
 !data/output/.gitkeep
+data/evaluation/cache/
+data/evaluation/images/
 
 # Logs
 *.log

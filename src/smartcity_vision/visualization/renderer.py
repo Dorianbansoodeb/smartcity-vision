@@ -52,7 +52,7 @@ class FrameRenderer:
         """
         self._config = config
         self._color_cache: dict[str, Color] = {
-            name.lower(): tuple(colour) for name, colour in config.class_colors.items()
+            name.lower(): colour for name, colour in config.class_colors.items()
         }
 
     def color_of(self, class_name: str) -> Color:

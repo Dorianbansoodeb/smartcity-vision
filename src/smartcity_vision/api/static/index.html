@@ -88,14 +88,23 @@
 </head>
 <body>
   <main>
-    <p class="kicker">Live server run · not a GIF</p>
+    <p class="kicker">Measured replay · live verify</p>
     <h1>SmartCity Vision</h1>
     <p class="lede">
-      Click Analyze to run YOLOv8 + ByteTrack on this machine. The annotated
-      video and the numbers below come from that request. Nothing is mocked.
+      The clip below is a real annotated run — boxes, track IDs, lines, zones.
+      Analyze re-runs YOLOv8 + ByteTrack on this server so you can verify the
+      numbers yourself. First click after idle can take about a minute.
+    </p>
+    <div class="stage" style="margin-bottom: 10px;">
+      <img id="preview" src="/demo/preview" alt="Pre-rendered annotated parking-lot run with boxes and track IDs" style="display:block;width:100%;height:auto;" />
+    </div>
+    <p class="caption" style="margin-bottom: 22px;">
+      Pre-rendered output from a full local run (647 frames). Analyze below
+      processes the first 64 frames on this machine and replaces the right-hand
+      video with that live result.
     </p>
     <div class="actions">
-      <button id="analyze" class="primary" type="button">Analyze sample clip</button>
+      <button id="analyze" class="primary" type="button">Run it yourself</button>
       <a class="btn ghost" href="https://github.com/Dorianbansoodeb/smartcity-vision">GitHub</a>
       <span id="status" class="status">Checking the server…</span>
     </div>
@@ -124,7 +133,7 @@
       <li>Unique counts are keyed on track identity, not raw boxes. If a person is seen on 20 frames, that is one object.</li>
       <li>Privacy redaction runs before the video is written. Haar cascades are not in this OpenCV build; fallback regions are used.</li>
       <li>The first click after idle can take about a minute: Fly stops the machine when nobody is using it, then the model loads.</li>
-      <li>Precision, recall, and mAP are not quoted — this clip has no ground-truth labels.</li>
+      <li>This parking-lot clip is unlabelled. Precision / recall / mAP@50 are measured on a COCO val2017 slice in the README, not invented here.</li>
     </ul>
 
     <footer>

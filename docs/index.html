@@ -101,9 +101,9 @@
         <div class="note">lot_midline · A→B</div>
       </div>
       <div class="card">
-        <div class="label">MPS throughput</div>
-        <div class="value">47.2</div>
-        <div class="note">fps median, ByteTrack</div>
+        <div class="label">COCO-slice mAP@50</div>
+        <div class="value">0.44</div>
+        <div class="note">80 val images · P 0.77 · R 0.53</div>
       </div>
     </div>
 
@@ -113,6 +113,7 @@
       <li>Unique counting is keyed on identity, not boxes — 344 detections collapse to 10 objects.</li>
       <li>Peak congestion on this clip was <span class="ok">LOW</span>. Mean speed 81.5 px/s, uncalibrated.</li>
       <li>ONNX Runtime was slower on the mean than PyTorch on CPU (39.7 vs 29.7 ms) and tighter on the p95. That measurement is in the repo.</li>
+      <li>A second clip (Intel <code>car-detection.mp4</code>) produced 6 unique objects, all vehicles. Different scene, same weights.</li>
     </ul>
 
     <h2>This page is a static replay</h2>

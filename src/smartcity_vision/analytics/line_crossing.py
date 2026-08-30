@@ -160,7 +160,7 @@ class LineCrossingDetector:
         for line in self._lines:
             if line.classes and detection.class_name not in line.classes:
                 continue
-            start, end = tuple(line.start), tuple(line.end)
+            start, end = line.start, line.end
             if not segments_intersect((previous, current), (start, end)):
                 continue
             before = side_of_line(previous, start, end)

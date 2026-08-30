@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir -r /app/requirements-demo.txt
 COPY pyproject.toml README.md /app/
 COPY src /app/src
 COPY config /app/config
+COPY docs/images/demo.gif /app/src/smartcity_vision/api/static/preview.gif
 RUN pip install --no-cache-dir --no-deps -e .
 
 RUN mkdir -p /app/models /app/data/input /app/data/output \

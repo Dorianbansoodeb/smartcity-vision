@@ -12,6 +12,8 @@ same object is reused for a whole run.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from smartcity_vision.detection.detector import YoloDetector
@@ -40,7 +42,7 @@ class YoloTracker(YoloDetector):
         """Name of the Ultralytics tracker configuration in use."""
         return self._tracking_config.tracker
 
-    def _run(self, image: np.ndarray) -> list:
+    def _run(self, image: np.ndarray) -> Any:
         """Track through this frame, carrying identities over from the last one.
 
         ``persist=True`` is what stops the tracker being reinitialised on every

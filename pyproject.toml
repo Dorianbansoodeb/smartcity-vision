@@ -28,7 +28,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.6", "httpx>=0.27"]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "httpx>=0.27",
+    "mypy>=1.11",
+    "types-PyYAML>=6.0",
+    "pandas-stubs>=2.2",
+]
 
 [project.scripts]
 smartcity-vision = "smartcity_vision.cli:main"
@@ -43,6 +50,32 @@ smartcity_vision = ["api/static/*"]
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]
 addopts = "-q"
+
+[tool.mypy]
+# 3.12 so current numpy stubs (PEP 695 `type` statements) parse. Runtime is 3.11+.
+python_version = "3.12"
+mypy_path = "src"
+packages = ["smartcity_vision"]
+pretty = true
+show_error_codes = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+exclude = ["tests", "scripts"]
+
+[[tool.mypy.overrides]]
+module = [
+    "cv2",
+    "ultralytics",
+    "ultralytics.*",
+    "torch",
+    "torch.*",
+    "prometheus_client",
+    "mlflow",
+    "mlflow.*",
+    "onnxruntime",
+    "lap",
+]
+ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 100

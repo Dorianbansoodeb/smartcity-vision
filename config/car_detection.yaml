@@ -1,0 +1,95 @@
+# Highway / denser-traffic clip (Intel IoT car-detection.mp4).
+#
+# Geometry from config/default.yaml is for the 768x432 parking-lot clip and
+# does not apply here, so lines and zones are empty. Density uses the whole
+# frame. Thresholds are higher because this clip actually has traffic.
+
+model:
+  weights: models/yolov8n.pt
+  device: auto
+  confidence_threshold: 0.25
+  iou_threshold: 0.45
+  image_size: 640
+  max_detections: 300
+  warmup: true
+  target_classes:
+    - car
+    - truck
+    - bus
+    - motorcycle
+    - bicycle
+    - person
+
+tracking:
+  enabled: true
+  tracker: bytetrack.yaml
+
+analytics:
+  counting:
+    min_track_frames: 3
+    forget_track_after_frames: 90
+  lines: []
+  zones: []
+  trajectories:
+    history_length: 30
+    forget_after_frames: 90
+  density:
+    window_frames: 30
+    moderate_threshold: 6.0
+    high_threshold: 12.0
+    max_expected_vehicles: 24
+    region: ""
+  queue:
+    window_frames: 30
+    stopped_px_per_sec: 25.0
+    metres_per_pixel: null
+  speed:
+    window_frames: 8
+    metres_per_pixel: null
+    reference_points: null
+    reference_distance_m: null
+
+video:
+  source: data/input/cars.mp4
+  loop: false
+  frame_skip: 0
+  max_frames: null
+  display: false
+
+output:
+  directory: data/output
+  write_annotated_video: true
+  annotated_video_name: cars_annotated.mp4
+  video_codec: mp4v
+  fallback_fps: 25.0
+
+visualization:
+  box_thickness: 2
+  font_scale: 0.5
+  show_labels: true
+  show_confidence: true
+  show_track_ids: true
+  show_hud: true
+  hud_position: top-left
+  show_trajectories: true
+  show_lines: false
+  show_zones: false
+  trail_thickness: 2
+  class_colors: {}
+
+privacy:
+  enabled: true
+  method: blur
+  blur_strength: 21
+  pixel_size: 8
+
+monitoring:
+  prometheus_enabled: true
+  drift_window_frames: 60
+  drift_threshold: 0.35
+  drift_min_detections: 20
+
+logging:
+  level: INFO
+  file: null
+  progress_every_frames: 50

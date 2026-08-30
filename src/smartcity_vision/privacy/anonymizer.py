@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import cv2
 import numpy as np
@@ -124,21 +125,21 @@ class FrameAnonymizer:
         image[y : y + height, x : x + width] = cv2.GaussianBlur(roi, (strength, strength), 0)
 
 
-def _load_cascade(filename: str) -> cv2.CascadeClassifier | None:
+def _load_cascade(filename: str) -> Any:
     """Load a Haar cascade shipped with OpenCV, or ``None`` if it is absent."""
-    cascade_dir = Path(cv2.data.haarcascades)
+    cascade_dir = Path(cv2.data.haarcascades)  # type: ignore[attr-defined]
     path = cascade_dir / filename
     if not path.is_file():
         logger.warning("Haar cascade %s is not installed; that detector is disabled", filename)
         return None
-    classifier = cv2.CascadeClassifier(str(path))
+    classifier = cv2.CascadeClassifier(str(path))  # type: ignore[attr-defined]
     if classifier.empty():
         logger.warning("Could not load Haar cascade %s", path)
         return None
     return classifier
 
 
-def _detect(classifier: cv2.CascadeClassifier | None, gray: np.ndarray) -> list[Region]:
+def _detect(classifier: Any, gray: np.ndarray) -> list[Region]:
     """Run a cascade, returning an empty list when the classifier is missing."""
     if classifier is None:
         return []

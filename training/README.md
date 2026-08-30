@@ -49,3 +49,13 @@ precision, recall, or mAP for them; those numbers do not exist yet.
 When you do evaluate a custom checkpoint, record the command, the dataset
 revision, and the numbers the evaluator printed. The `MODEL_CARD.md` and the
 README only accept figures produced that way.
+
+The current checkpoint was scored with:
+
+```bash
+python scripts/evaluate_coco.py --device cpu
+```
+
+That writes `data/evaluation/coco_val80_results.json`. Swap `--weights` (via
+config) when you have a custom `.pt`; do not paste a number you did not just
+generate.

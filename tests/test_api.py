@@ -26,7 +26,10 @@ def test_demo_page_and_idle_status_are_reachable() -> None:
 
     page = client.get("/")
     assert page.status_code == 200
-    assert "Analyze sample clip" in page.text
+    assert "Run it yourself" in page.text
+    preview = client.get("/demo/preview")
+    assert preview.status_code == 200
+    assert preview.headers["content-type"].startswith("image/gif")
 
     status = client.get("/demo/status")
     assert status.status_code == 200

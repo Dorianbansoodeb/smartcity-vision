@@ -93,12 +93,26 @@ def _series(frame: pd.DataFrame, column: str) -> list[dict[str, Any]]:
         return []
     return [
         {
-            "frame_index": int(row.frame_index),
-            "timestamp": float(row.timestamp),
-            column: None if pd.isna(getattr(row, column)) else float(getattr(row, column)),
+            "frame_index": _as_int(row.frame_index),
+            "timestamp": _as_float(row.timestamp),
+            column: None if pd.isna(getattr(row, column)) else _as_float(getattr(row, column)),
         }
         for row in frame.itertuples(index=False)
     ]
+
+
+def _as_int(value: object) -> int:
+    """Coerce a pandas cell that this table stores as a whole number."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise TypeError(f"expected a numeric cell, got {type(value)!r}")
+    return int(value)
+
+
+def _as_float(value: object) -> float:
+    """Coerce a pandas cell that this table stores as a real number."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise TypeError(f"expected a numeric cell, got {type(value)!r}")
+    return float(value)
 
 
 def _mean(frame: pd.DataFrame, column: str) -> float | None:
@@ -124,10 +138,10 @@ def _peak_congestion(metrics: pd.DataFrame) -> list[dict[str, Any]]:
     subset = metrics[metrics["congestion"] == peak_label]
     return [
         {
-            "frame_index": int(row.frame_index),
-            "timestamp": float(row.timestamp),
+            "frame_index": _as_int(row.frame_index),
+            "timestamp": _as_float(row.timestamp),
             "congestion": peak_label,
-            "vehicles_in_region": int(row.vehicles_in_region),
+            "vehicles_in_region": _as_int(row.vehicles_in_region),
         }
         for row in subset.itertuples(index=False)
     ]

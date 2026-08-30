@@ -16,7 +16,8 @@ named individuals.
 - Identifying people (face recognition, re-identification, gait)
 - Reading licence-plate characters
 - Legal evidence or automated enforcement
-- Night-time, weather-degraded, or heavily occluded scenes (unvalidated)
+- Night-time, weather-degraded, or heavily occluded scenes (the road clip is a
+  second daytime scene, not a weather split)
 - Any jurisdiction's official traffic counts
 
 ## Model
@@ -35,10 +36,21 @@ bytes that produced it.
 
 ## Data
 
-v1 uses the public Intel IoT DevKit clip
-`person-bicycle-car-detection.mp4`. It has **no ground-truth labels** in this
-repository, so precision, recall, mAP@50, and mAP@50-95 are **not reported**.
-Those metrics have not been computed.
+v1 uses two public Intel IoT DevKit clips
+(`person-bicycle-car-detection.mp4`, `car-detection.mp4`). Neither has
+ground-truth labels in this repository, so they cannot produce precision,
+recall, or mAP.
+
+Detection quality was measured on an 80-image COCO val2017 slice (seed 0,
+road-user classes only) with the matcher in `smartcity_vision.evaluation`.
+Recorded figures, not estimates:
+
+| | mAP@50 | Precision | Recall |
+| --- | --- | --- | --- |
+| Aggregate | 0.4419 | 0.7653 | 0.5296 |
+
+This is not full COCO val and is not comparable to published YOLOv8n scores.
+Command and JSON: `data/evaluation/`. mAP@50-95 was not computed.
 
 ## Known limitations
 

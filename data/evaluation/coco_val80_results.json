@@ -1,0 +1,100 @@
+{
+  "dataset": "COCO val2017 traffic-class slice",
+  "slice_path": "data/evaluation/coco_val80_slice.json",
+  "images": 80,
+  "seed": 0,
+  "weights": "models/yolov8n.pt",
+  "device": "cpu",
+  "confidence_threshold": 0.25,
+  "iou_threshold": 0.45,
+  "image_size": 640,
+  "classes": [
+    "person",
+    "bicycle",
+    "car",
+    "motorcycle",
+    "bus",
+    "truck"
+  ],
+  "metrics": {
+    "iou_threshold": 0.5,
+    "images": 80,
+    "map50": 0.4419,
+    "micro_precision": 0.7653,
+    "micro_recall": 0.5296,
+    "per_class": [
+      {
+        "class_name": "person",
+        "ground_truths": 303,
+        "predictions": 234,
+        "true_positives": 184,
+        "false_positives": 49,
+        "false_negatives": 119,
+        "precision": 0.7897,
+        "recall": 0.6073,
+        "ap50": 0.5654
+      },
+      {
+        "class_name": "bicycle",
+        "ground_truths": 25,
+        "predictions": 14,
+        "true_positives": 9,
+        "false_positives": 5,
+        "false_negatives": 16,
+        "precision": 0.6429,
+        "recall": 0.36,
+        "ap50": 0.2598
+      },
+      {
+        "class_name": "car",
+        "ground_truths": 155,
+        "predictions": 97,
+        "true_positives": 69,
+        "false_positives": 28,
+        "false_negatives": 86,
+        "precision": 0.7113,
+        "recall": 0.4452,
+        "ap50": 0.4142
+      },
+      {
+        "class_name": "motorcycle",
+        "ground_truths": 42,
+        "predictions": 27,
+        "true_positives": 22,
+        "false_positives": 5,
+        "false_negatives": 20,
+        "precision": 0.8148,
+        "recall": 0.5238,
+        "ap50": 0.517
+      },
+      {
+        "class_name": "bus",
+        "ground_truths": 20,
+        "predictions": 15,
+        "true_positives": 12,
+        "false_positives": 3,
+        "false_negatives": 8,
+        "precision": 0.8,
+        "recall": 0.6,
+        "ap50": 0.5652
+      },
+      {
+        "class_name": "truck",
+        "ground_truths": 46,
+        "predictions": 23,
+        "true_positives": 17,
+        "false_positives": 6,
+        "false_negatives": 29,
+        "precision": 0.7391,
+        "recall": 0.3696,
+        "ap50": 0.3296
+      }
+    ],
+    "notes": [
+      "AP@50 is the 101-point interpolated curve (COCO mAP@0.50).",
+      "Precision and recall are at the detector's operating point, not swept.",
+      "Crowd boxes are ignore regions and do not create false negatives.",
+      "mAP averages only classes that have at least one non-crowd ground truth."
+    ]
+  }
+}

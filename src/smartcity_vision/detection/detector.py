@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
+from typing import Any
 
 import numpy as np
 import torch
@@ -225,7 +226,7 @@ class YoloDetector:
             inference_ms=inference_ms,
         )
 
-    def _run(self, image: np.ndarray) -> list:
+    def _run(self, image: np.ndarray) -> Any:
         """Invoke the model on one image.
 
         Overridden by :class:`~smartcity_vision.detection.tracker.YoloTracker` to
@@ -233,7 +234,7 @@ class YoloDetector:
         """
         return self._model.predict(source=image, **self._inference_kwargs())
 
-    def _inference_kwargs(self) -> dict[str, object]:
+    def _inference_kwargs(self) -> dict[str, Any]:
         """Keyword arguments shared by prediction and tracking calls."""
         return {
             "conf": self._config.confidence_threshold,

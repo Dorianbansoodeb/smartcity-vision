@@ -21,6 +21,7 @@ jobs:
         run: |
           ruff check .
           ruff format --check .
+          mypy
       - name: Tests
         run: pytest
       - name: Docker build

@@ -1,0 +1,39 @@
+{
+  "clip": "Intel IoT car-detection.mp4",
+  "source": "data/input/cars.mp4",
+  "config": "config/car_detection.yaml",
+  "resolution": "768x432",
+  "fps": 12.5,
+  "frames_processed": 377,
+  "total_detections": 68,
+  "detections_by_class": {
+    "car": 50,
+    "bus": 15,
+    "truck": 2,
+    "person": 1
+  },
+  "unique_counts": {
+    "total": 6,
+    "counts_by_class": {
+      "car": 5,
+      "bus": 1
+    },
+    "tracks_observed": 8,
+    "discarded_tracks": 1,
+    "pending_tracks": 1
+  },
+  "peak_congestion": "LOW",
+  "mean_speed_px_s": 108.84,
+  "pipeline_fps": 46.28,
+  "avg_inference_ms": 19.24,
+  "p95_inference_ms": 26.76,
+  "device": "mps",
+  "tracker": "bytetrack.yaml",
+  "run_id": "675d1907f84e4e0c83608e5dadaadce6",
+  "notes": [
+    "Different scene from the parking-lot clip: road traffic, car-heavy, people almost absent.",
+    "Lines and zones from the parking-lot config do not apply; this run used empty geometry.",
+    "Last-frame rolling density was 0.0 because the vehicles had left the frame. Peak congestion was still LOW.",
+    "This clip is unlabelled. Do not quote precision, recall, or mAP from it."
+  ]
+}

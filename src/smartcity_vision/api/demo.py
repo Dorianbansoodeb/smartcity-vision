@@ -113,6 +113,24 @@ def demo_output() -> FileResponse:
     return FileResponse(WEB_VIDEO, media_type="video/mp4", filename="annotated.mp4")
 
 
+@router.get("/demo/preview")
+def demo_preview() -> FileResponse:
+    """Serve the pre-rendered annotated GIF so the page is not empty on cold start."""
+    path = _preview_gif()
+    if path is None:
+        raise HTTPException(status_code=404, detail="Preview GIF is not packaged on this server")
+    return FileResponse(path, media_type="image/gif", filename="preview.gif")
+
+
+def _preview_gif() -> Path | None:
+    """Resolve the pre-rendered GIF from the package or the repo docs folder."""
+    here = Path(__file__).resolve().parent
+    for candidate in (here / "static" / "preview.gif", Path("docs/images/demo.gif")):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def _run_demo_job() -> None:
     """Worker thread: run the pipeline, transcode, then release the lock."""
     try:
