@@ -14,8 +14,9 @@ from collections.abc import Sequence
 import cv2
 import numpy as np
 
+from smartcity_vision.analytics.trajectories import TrackTrail
 from smartcity_vision.detection.detector import Detection
-from smartcity_vision.utils.config import VisualizationConfig
+from smartcity_vision.utils.config import CountingLineConfig, VisualizationConfig, ZoneConfig
 
 _FONT = cv2.FONT_HERSHEY_SIMPLEX
 _TEXT_COLOR = (255, 255, 255)
@@ -81,6 +82,92 @@ class FrameRenderer:
             cv2.rectangle(image, (x1, y1), (x2, y2), colour, self._config.box_thickness)
             if self._config.show_labels:
                 self._draw_label(image, self._label_for(detection), (x1, y1), colour)
+        return image
+
+    def draw_trajectories(self, image: np.ndarray, trails: Sequence[TrackTrail]) -> np.ndarray:
+        """Draw capped centre-point trails in place.
+
+        Args:
+            image: BGR frame, modified in place.
+            trails: Per-track histories, oldest point first.
+
+        Returns:
+            The same array, for call chaining.
+        """
+        if not self._config.show_trajectories:
+            return image
+        thickness = self._config.trail_thickness
+        for trail in trails:
+            centers = trail.centers
+            if len(centers) < 2:
+                continue
+            colour = self.color_of(trail.class_name)
+            points = np.asarray(centers, dtype=np.int32).reshape((-1, 1, 2))
+            cv2.polylines(image, [points], isClosed=False, color=colour, thickness=thickness)
+        return image
+
+    def draw_lines(self, image: np.ndarray, lines: Sequence[CountingLineConfig]) -> np.ndarray:
+        """Draw counting lines and their names.
+
+        Args:
+            image: BGR frame, modified in place.
+            lines: Configured counting lines.
+
+        Returns:
+            The same array, for call chaining.
+        """
+        if not self._config.show_lines:
+            return image
+        colour = (0, 220, 255)
+        thickness = max(2, self._config.box_thickness)
+        for line in lines:
+            start = (round(line.start[0]), round(line.start[1]))
+            end = (round(line.end[0]), round(line.end[1]))
+            cv2.line(image, start, end, colour, thickness, cv2.LINE_AA)
+            label_at = (start[0], max(12, start[1] - 6))
+            cv2.putText(
+                image,
+                line.name,
+                label_at,
+                _FONT,
+                self._config.font_scale,
+                colour,
+                max(1, thickness - 1),
+                cv2.LINE_AA,
+            )
+        return image
+
+    def draw_zones(self, image: np.ndarray, zones: Sequence[ZoneConfig]) -> np.ndarray:
+        """Draw zone polygons as a translucent wash plus an outline.
+
+        Args:
+            image: BGR frame, modified in place.
+            zones: Configured polygonal zones.
+
+        Returns:
+            The same array, for call chaining.
+        """
+        if not self._config.show_zones:
+            return image
+        overlay = image.copy()
+        colour = (80, 180, 40)
+        for zone in zones:
+            pts = np.asarray(zone.polygon, dtype=np.int32).reshape((-1, 1, 2))
+            cv2.fillPoly(overlay, [pts], colour)
+            cv2.polylines(image, [pts], isClosed=True, color=colour, thickness=2)
+            label = f"{zone.name} ({zone.kind})"
+            anchor = (round(zone.polygon[0][0]), round(zone.polygon[0][1]) + 16)
+            cv2.putText(
+                image,
+                label,
+                anchor,
+                _FONT,
+                self._config.font_scale,
+                colour,
+                1,
+                cv2.LINE_AA,
+            )
+        cv2.addWeighted(overlay, 0.12, image, 0.88, 0, dst=image)
         return image
 
     def draw_hud(self, image: np.ndarray, lines: Sequence[str]) -> np.ndarray:

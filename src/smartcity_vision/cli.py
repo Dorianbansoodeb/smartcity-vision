@@ -14,9 +14,12 @@ from pathlib import Path
 from typing import Any
 
 from smartcity_vision import __version__
+from smartcity_vision.database.repository import AnalyticsRepository, resolve_database_path
 from smartcity_vision.detection.detector import YoloDetector
 from smartcity_vision.detection.tracker import YoloTracker
 from smartcity_vision.exceptions import SmartCityVisionError
+from smartcity_vision.experiments import log_run
+from smartcity_vision.reports.exporter import export_run
 from smartcity_vision.utils.config import AppConfig, load_config
 from smartcity_vision.utils.logging import get_logger, setup_logging
 from smartcity_vision.video.processor import (
@@ -181,7 +184,9 @@ def run(config: AppConfig) -> ProcessingStats:
         else YoloDetector(config.model)
     )
     stats = VideoProcessor(config, detector, source=source).run()
+    _persist_run(config, stats)
     _write_summary(config, stats)
+    log_run(config, stats)
     return stats
 
 
@@ -219,6 +224,24 @@ def main(argv: list[str] | None = None, default_source: str | None = None) -> in
         return 1
 
     return 130 if stats.interrupted else 0
+
+
+def _persist_run(config: AppConfig, stats: ProcessingStats) -> None:
+    """Write the run to SQLite and export CSV/JSON artefacts."""
+    repository = AnalyticsRepository(resolve_database_path(config))
+    crossings = () if stats.crossings is None else stats.crossings.events
+    zones = () if stats.zones is None else stats.zones.events
+    run_id = repository.save_run(
+        config,
+        stats.device,
+        stats.tracker,
+        stats.detection_rows,
+        crossings,
+        zones,
+        stats.metric_rows,
+    )
+    stats.run_id = run_id
+    export_run(repository, run_id, config.output.directory)
 
 
 def _write_summary(config: AppConfig, stats: ProcessingStats) -> None:

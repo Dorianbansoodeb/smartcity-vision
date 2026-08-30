@@ -18,8 +18,17 @@ import cv2
 import numpy as np
 
 from smartcity_vision.analytics.counter import CountingSummary, UniqueObjectCounter
+from smartcity_vision.analytics.density import DensityEstimator
+from smartcity_vision.analytics.line_crossing import CrossingSummary, LineCrossingDetector
+from smartcity_vision.analytics.queue import QueueEstimator
+from smartcity_vision.analytics.speed import SpeedEstimator
+from smartcity_vision.analytics.trajectories import TrajectoryStore
+from smartcity_vision.analytics.zones import ZoneMonitor, ZoneSummary
+from smartcity_vision.database.repository import DetectionRow, MetricRow
 from smartcity_vision.detection.detector import DetectionResult, YoloDetector
 from smartcity_vision.exceptions import VideoSourceError
+from smartcity_vision.monitoring.drift import DriftDetector
+from smartcity_vision.privacy.anonymizer import FrameAnonymizer
 from smartcity_vision.utils.config import AppConfig
 from smartcity_vision.utils.logging import get_logger
 from smartcity_vision.video.source import (
@@ -66,6 +75,15 @@ class ProcessingStats:
     device: str = "unknown"
     tracker: str | None = None
     counting: CountingSummary | None = None
+    crossings: CrossingSummary | None = None
+    zones: ZoneSummary | None = None
+    density: dict[str, Any] | None = None
+    queue: dict[str, Any] | None = None
+    speed: dict[str, Any] | None = None
+    detection_rows: list[DetectionRow] = field(default_factory=list, repr=False)
+    metric_rows: list[MetricRow] = field(default_factory=list, repr=False)
+    run_id: str | None = None
+    drift: dict[str, Any] | None = None
     interrupted: bool = False
 
     @property
@@ -106,6 +124,13 @@ class ProcessingStats:
             "device": self.device,
             "tracker": self.tracker,
             "unique_counts": self.counting.as_dict() if self.counting else None,
+            "crossings": self.crossings.as_dict() if self.crossings else None,
+            "zones": self.zones.as_dict() if self.zones else None,
+            "density": self.density,
+            "queue": self.queue,
+            "speed": self.speed,
+            "run_id": self.run_id,
+            "drift": self.drift,
             "output_video": str(self.output_video) if self.output_video else None,
             "interrupted": self.interrupted,
         }
@@ -138,6 +163,16 @@ class VideoProcessor:
         self._renderer = renderer or FrameRenderer(config.visualization)
         self._source = source or create_source_from_config(config)
         self._counter = counter or self._default_counter(config)
+        self._crossings = LineCrossingDetector(config.analytics.lines)
+        self._zones = ZoneMonitor(config.analytics.zones)
+        self._trajectories = TrajectoryStore(config.analytics.trajectories)
+        self._density = DensityEstimator(
+            config.analytics.density, _region_polygon(config, config.analytics.density.region)
+        )
+        self._queue = QueueEstimator(config.analytics.queue)
+        self._speed = SpeedEstimator(config.analytics.speed)
+        self._anonymizer = FrameAnonymizer(config.privacy)
+        self._drift = DriftDetector(config.monitoring)
         self._recent_frame_durations: deque[float] = deque(maxlen=_FPS_WINDOW)
 
     @staticmethod
@@ -180,7 +215,18 @@ class VideoProcessor:
                     result = self._detector.detect(frame)
                     if self._counter is not None:
                         self._counter.update(result)
+                    self._crossings.update(result)
+                    self._zones.update(result)
+                    self._trajectories.update(result)
+                    self._density.update(result)
+                    self._queue.update(result, self._trajectories)
+                    self._speed.update(result, self._trajectories)
+                    self._drift.update(result)
                     annotated = self._annotate(frame, result)
+                    if self._anonymizer.enabled:
+                        annotated, _ = self._anonymizer.anonymize(
+                            annotated, list(result.detections)
+                        )
 
                     if writer is None and self._config.output.write_annotated_video:
                         writer = self._create_writer(metadata, annotated)
@@ -197,6 +243,33 @@ class VideoProcessor:
                     stats.total_detections += len(result)
                     stats.inference_ms_samples.append(result.inference_ms)
                     class_counter.update(detection.class_name for detection in result.detections)
+                    stats.detection_rows.extend(
+                        DetectionRow(
+                            frame_index=result.frame_index,
+                            timestamp=result.timestamp,
+                            detection=detection,
+                        )
+                        for detection in result.detections
+                    )
+                    density = self._density.current
+                    queue = self._queue.current
+                    speeds = self._speed.current
+                    stats.metric_rows.append(
+                        MetricRow(
+                            frame_index=result.frame_index,
+                            timestamp=result.timestamp,
+                            vehicles_in_frame=0 if density is None else density.vehicles_in_frame,
+                            vehicles_in_region=0 if density is None else density.vehicles_in_region,
+                            congestion="LOW" if density is None else density.congestion,
+                            queued_vehicles=0 if queue is None else queue.queued_vehicles,
+                            queue_length_px=0.0 if queue is None else queue.length_px,
+                            mean_speed_px_s=(
+                                None
+                                if not speeds
+                                else sum(item.speed_px_s for item in speeds) / len(speeds)
+                            ),
+                        )
+                    )
                     self._recent_frame_durations.append(perf_counter() - frame_started)
 
                     self._log_progress(stats, metadata)
@@ -217,12 +290,21 @@ class VideoProcessor:
         stats.tracker = getattr(self._detector, "tracker_name", None)
         if self._counter is not None:
             stats.counting = self._counter.summary()
+        stats.crossings = self._crossings.summary()
+        stats.zones = self._zones.summary()
+        stats.density = self._density.as_dict()
+        stats.queue = self._queue.as_dict()
+        stats.speed = self._speed.as_dict()
+        stats.drift = None if self._drift.latest is None else self._drift.latest.as_dict()
         self._log_summary(stats)
         return stats
 
     def _annotate(self, frame: Frame, result: DetectionResult) -> np.ndarray:
         """Return an annotated copy of ``frame``, leaving the original untouched."""
         annotated = frame.image.copy()
+        self._renderer.draw_zones(annotated, self._config.analytics.zones)
+        self._renderer.draw_lines(annotated, self._config.analytics.lines)
+        self._renderer.draw_trajectories(annotated, self._trajectories.active_trails())
         self._renderer.draw_detections(annotated, result.detections)
         self._renderer.draw_hud(annotated, self._hud_lines(frame, result))
         return annotated
@@ -245,6 +327,23 @@ class VideoProcessor:
                 lines.append(
                     "  ".join(f"{name}:{count}" for name, count in summary.counts_by_class.items())
                 )
+
+        crossings = self._crossings.summary()
+        if crossings.events:
+            lines.append(f"Crossings: {len(crossings.events)}")
+        zone_bits = [
+            f"{name}:{occ.occupants}"
+            for name, occ in self._zones.summary().occupancy.items()
+            if occ.occupants
+        ]
+        if zone_bits:
+            lines.append("Zone " + "  ".join(zone_bits))
+        density = self._density.current
+        if density is not None:
+            lines.append(f"Density {density.vehicles_in_region}  {density.congestion}")
+        queue = self._queue.current
+        if queue is not None and queue.queued_vehicles:
+            lines.append(f"Queue {queue.queued_vehicles}  {queue.length_px:.0f}px")
         return lines
 
     def _rolling_fps(self) -> float:
@@ -355,6 +454,43 @@ class VideoProcessor:
                 stats.counting.discarded_tracks,
                 stats.counting.pending_tracks,
             )
+        if stats.crossings is not None and stats.crossings.events:
+            logger.info(
+                "Line crossings: %d (%s)",
+                len(stats.crossings.events),
+                ", ".join(
+                    f"{name} {count}" for name, count in stats.crossings.counts_by_line.items()
+                ),
+            )
+        if stats.zones is not None and (stats.zones.enters or stats.zones.exits):
+            logger.info(
+                "Zone events: %d enter, %d exit",
+                stats.zones.enters,
+                stats.zones.exits,
+            )
+        if stats.density is not None and stats.density.get("current"):
+            logger.info(
+                "Peak congestion: %s (last rolling avg %.2f vehicles)",
+                stats.density["peak_congestion"],
+                stats.density["current"]["rolling_average"],
+            )
+        if stats.speed is not None and stats.speed.get("mean_speed_px_s") is not None:
+            logger.info(
+                "Mean estimated speed: %.1f px/s%s",
+                stats.speed["mean_speed_px_s"],
+                "" if not stats.speed["calibrated"] else f" ({stats.speed['mean_speed_kmh']} km/h)",
+            )
+
+
+def _region_polygon(config: AppConfig, region_name: str) -> tuple[tuple[float, float], ...] | None:
+    """Resolve a density region name to a polygon, or ``None`` for the whole frame."""
+    if not region_name:
+        return None
+    for zone in config.analytics.zones:
+        if zone.name == region_name:
+            return zone.polygon
+    logger.warning("Density region %r is not a configured zone; using the whole frame", region_name)
+    return None
 
 
 def _fourcc(codec: str) -> int:

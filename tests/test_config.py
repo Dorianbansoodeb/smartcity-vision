@@ -24,6 +24,19 @@ def test_shipped_default_config_is_valid() -> None:
     assert config.model.image_size % 32 == 0
     assert "car" in config.model.target_classes
     assert config.output.directory == Path("data/output")
+    assert config.analytics.lines
+    assert config.analytics.zones
+    assert all(len(zone.polygon) >= 3 for zone in config.analytics.zones)
+
+
+def test_a_zone_with_fewer_than_three_vertices_is_rejected(tmp_path: Path) -> None:
+    path = write_config(
+        tmp_path,
+        "analytics:\n  zones:\n    - name: bad\n      polygon: [[0, 0], [1, 1]]\n",
+    )
+
+    with pytest.raises(ConfigError, match="at least three vertices"):
+        load_config(path)
 
 
 def test_yaml_overrides_only_the_keys_it_sets(tmp_path: Path) -> None:

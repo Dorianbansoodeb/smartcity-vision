@@ -18,6 +18,9 @@ htmlcov/
 # Model weights (downloaded on first run)
 models/*
 !models/.gitkeep
+*.onnx
+mlruns/
+mlartifacts/
 
 # Data (inputs are large, outputs are generated)
 data/input/*

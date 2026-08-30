@@ -94,10 +94,131 @@ class CountingConfig(_Section):
     forget_track_after_frames: int = Field(default=90, ge=1)
 
 
+class CountingLineConfig(_Section):
+    """One directed counting line in image coordinates.
+
+    Direction A is the left side of ``start→end``, B the right side. Coordinates
+    are pixels in the source frame; nothing here is hardcoded per video.
+    """
+
+    name: str
+    start: tuple[float, float]
+    end: tuple[float, float]
+    # Empty means every target class can trigger a crossing.
+    classes: tuple[str, ...] = ()
+
+    @field_validator("name")
+    @classmethod
+    def _non_empty_name(cls, value: str) -> str:
+        """Reject a blank line name."""
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("counting line name must not be empty")
+        return stripped
+
+    @field_validator("start", "end")
+    @classmethod
+    def _two_finite_coords(cls, value: tuple[float, float]) -> tuple[float, float]:
+        """Require a finite 2-D point."""
+        if len(value) != 2:
+            raise ValueError("line endpoints must be [x, y]")
+        if any(not _is_finite(coord) for coord in value):
+            raise ValueError("line endpoints must be finite numbers")
+        return (float(value[0]), float(value[1]))
+
+    @field_validator("classes")
+    @classmethod
+    def _normalised_classes(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        """Lower-case and de-duplicate class filters."""
+        return tuple(dict.fromkeys(name.strip().lower() for name in value if name.strip()))
+
+
+class ZoneConfig(_Section):
+    """One polygonal analytics zone in image coordinates."""
+
+    name: str
+    kind: Literal[
+        "intersection",
+        "road_segment",
+        "pedestrian_crossing",
+        "restricted_zone",
+    ] = "road_segment"
+    polygon: tuple[tuple[float, float], ...]
+
+    @field_validator("name")
+    @classmethod
+    def _non_empty_name(cls, value: str) -> str:
+        """Reject a blank zone name."""
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("zone name must not be empty")
+        return stripped
+
+    @field_validator("polygon")
+    @classmethod
+    def _closed_enough(
+        cls, value: tuple[tuple[float, float], ...]
+    ) -> tuple[tuple[float, float], ...]:
+        """Require at least three finite vertices."""
+        if len(value) < 3:
+            raise ValueError("a zone polygon needs at least three vertices")
+        cleaned: list[tuple[float, float]] = []
+        for vertex in value:
+            if len(vertex) != 2 or any(not _is_finite(coord) for coord in vertex):
+                raise ValueError("zone vertices must be finite [x, y] pairs")
+            cleaned.append((float(vertex[0]), float(vertex[1])))
+        return tuple(cleaned)
+
+
+class TrajectoryConfig(_Section):
+    """Per-track centre-point history."""
+
+    history_length: int = Field(default=30, ge=2)
+    forget_after_frames: int = Field(default=90, ge=1)
+
+
+class DensityConfig(_Section):
+    """Rolling vehicle-count density and congestion labels."""
+
+    window_frames: int = Field(default=30, ge=1)
+    moderate_threshold: float = Field(default=3.0, ge=0.0)
+    high_threshold: float = Field(default=6.0, ge=0.0)
+    max_expected_vehicles: int = Field(default=12, ge=1)
+    # Empty uses the whole frame; otherwise the named zone's polygon.
+    region: str = ""
+
+
+class QueueConfig(_Section):
+    """Stopped-vehicle queue estimation."""
+
+    window_frames: int = Field(default=30, ge=1)
+    stopped_px_per_sec: float = Field(default=20.0, ge=0.0)
+    metres_per_pixel: float | None = Field(default=None, gt=0.0)
+
+
+class SpeedConfig(_Section):
+    """Per-track speed estimation.
+
+    Uncalibrated mode reports px/s only. Supply either ``metres_per_pixel`` or
+    two ``reference_points`` plus ``reference_distance_m`` to also report km/h.
+    """
+
+    window_frames: int = Field(default=8, ge=2)
+    metres_per_pixel: float | None = Field(default=None, gt=0.0)
+    reference_points: tuple[tuple[float, float], tuple[float, float]] | None = None
+    reference_distance_m: float | None = Field(default=None, gt=0.0)
+
+
 class AnalyticsConfig(_Section):
-    """Traffic-analytics settings. Extended by later phases."""
+    """Traffic-analytics settings."""
 
     counting: CountingConfig = Field(default_factory=CountingConfig)
+    lines: tuple[CountingLineConfig, ...] = ()
+    zones: tuple[ZoneConfig, ...] = ()
+    trajectories: TrajectoryConfig = Field(default_factory=TrajectoryConfig)
+    density: DensityConfig = Field(default_factory=DensityConfig)
+    queue: QueueConfig = Field(default_factory=QueueConfig)
+    speed: SpeedConfig = Field(default_factory=SpeedConfig)
 
 
 class VideoConfig(_Section):
@@ -132,6 +253,10 @@ class VisualizationConfig(_Section):
     # No corner is universally free of traffic, so where the panel sits is a
     # per-camera decision rather than something to hardcode.
     hud_position: Literal["top-left", "top-right", "bottom-left", "bottom-right"] = "top-left"
+    show_trajectories: bool = True
+    show_lines: bool = True
+    show_zones: bool = True
+    trail_thickness: int = Field(default=2, ge=1)
     class_colors: dict[str, tuple[int, int, int]] = Field(default_factory=dict)
 
     @field_validator("class_colors")
@@ -142,6 +267,24 @@ class VisualizationConfig(_Section):
             if any(not 0 <= channel <= 255 for channel in colour):
                 raise ValueError(f"class_colors[{class_name!r}] channels must be within 0-255")
         return value
+
+
+class PrivacyConfig(_Section):
+    """Face and licence-plate anonymisation, on by default."""
+
+    enabled: bool = True
+    method: Literal["blur", "pixelate"] = "blur"
+    blur_strength: int = Field(default=21, ge=3)
+    pixel_size: int = Field(default=8, ge=2)
+
+
+class MonitoringConfig(_Section):
+    """Observability and drift-detection settings."""
+
+    prometheus_enabled: bool = True
+    drift_window_frames: int = Field(default=60, ge=5)
+    drift_threshold: float = Field(default=0.35, ge=0.0, le=1.0)
+    drift_min_detections: int = Field(default=20, ge=1)
 
 
 class LoggingConfig(_Section):
@@ -161,6 +304,8 @@ class AppConfig(_Section):
     video: VideoConfig = Field(default_factory=VideoConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
     visualization: VisualizationConfig = Field(default_factory=VisualizationConfig)
+    privacy: PrivacyConfig = Field(default_factory=PrivacyConfig)
+    monitoring: MonitoringConfig = Field(default_factory=MonitoringConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
     def snapshot(self) -> dict[str, Any]:
@@ -170,6 +315,11 @@ class AppConfig(_Section):
         alongside predictions so a result can be traced back to its settings.
         """
         return self.model_dump(mode="json")
+
+
+def _is_finite(value: float) -> bool:
+    """Whether ``value`` is a usable coordinate."""
+    return value == value and value not in (float("inf"), float("-inf"))
 
 
 def resolve_path(path: Path | str) -> Path:
@@ -287,7 +437,15 @@ __all__ = [
     "AnalyticsConfig",
     "AppConfig",
     "CountingConfig",
+    "CountingLineConfig",
+    "DensityConfig",
     "LoggingConfig",
+    "MonitoringConfig",
+    "PrivacyConfig",
+    "QueueConfig",
+    "SpeedConfig",
+    "TrajectoryConfig",
+    "ZoneConfig",
     "ModelConfig",
     "OutputConfig",
     "TrackingConfig",

@@ -1,0 +1,20 @@
+# Sample Ultralytics data.yaml for a future custom-training run.
+# Classes below are the ones a traffic-operations model would add on top of
+# the COCO subset used in v1. This file is a template, not a trained dataset.
+
+path: ../data/custom
+train: images/train
+val: images/val
+
+names:
+  0: car
+  1: truck
+  2: bus
+  3: motorcycle
+  4: bicycle
+  5: person
+  6: emergency_vehicle
+  7: damaged_vehicle
+  8: stopped_vehicle
+  9: accident
+  10: illegally_parked_vehicle

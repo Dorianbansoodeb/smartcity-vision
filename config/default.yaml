@@ -44,6 +44,48 @@ analytics:
     # Per-track bookkeeping is dropped this long after a track disappears,
     # keeping memory bounded on long or live streams.
     forget_track_after_frames: 90
+  # Pixel coordinates for the Intel sample clip (768x432). Retune per camera;
+  # nothing in the code hardcodes these values.
+  lines:
+    - name: lot_midline
+      start: [40, 200]
+      end: [728, 200]
+      classes: []
+    - name: lot_centre
+      start: [360, 30]
+      end: [360, 410]
+      classes: []
+  zones:
+    - name: parking_lot
+      kind: road_segment
+      polygon:
+        - [20, 20]
+        - [748, 20]
+        - [748, 412]
+        - [20, 412]
+  trajectories:
+    history_length: 30
+    forget_after_frames: 90
+  density:
+    window_frames: 30
+    # Thresholds are in vehicles (rolling average), not detections.
+    moderate_threshold: 2.0
+    high_threshold: 4.0
+    max_expected_vehicles: 8
+    region: parking_lot
+  queue:
+    window_frames: 30
+    # Below this centre speed a vehicle is treated as queued. Pixel units;
+    # convert to metres later via metres_per_pixel.
+    stopped_px_per_sec: 25.0
+    metres_per_pixel: null
+  speed:
+    window_frames: 8
+    # Uncalibrated: reports px/s only. To get km/h, set metres_per_pixel or
+    # two reference_points plus reference_distance_m.
+    metres_per_pixel: null
+    reference_points: null
+    reference_distance_m: null
 
 video:
   # File path, webcam index ("0"), or stream URL ("rtsp://host/stream").
@@ -70,8 +112,28 @@ visualization:
   # Bottom-left is empty tarmac in the sample clip; vehicles enter top-left and
   # would otherwise be hidden behind the panel. Retune per camera.
   hud_position: bottom-left
+  show_trajectories: true
+  show_lines: true
+  show_zones: true
+  trail_thickness: 2
   # Optional per-class BGR overrides; unlisted classes get a stable hashed colour.
   class_colors: {}
+
+privacy:
+  # On by default: frames are redacted before any video is written to disk.
+  # OpenCV 5 wheels may not ship Haar cascades; detections then drive a
+  # geometry fallback (person-head / vehicle-plate regions).
+  enabled: true
+  method: blur          # blur | pixelate
+  blur_strength: 21     # Gaussian kernel; odd values work best
+  pixel_size: 8
+
+monitoring:
+  prometheus_enabled: true
+  drift_window_frames: 60
+  # Total-variation distance against the baseline class distribution.
+  drift_threshold: 0.35
+  drift_min_detections: 20
 
 logging:
   level: INFO

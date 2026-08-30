@@ -1,0 +1,33 @@
+{
+  "title": "SmartCity Vision",
+  "uid": "smartcity-vision",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Inference latency (seconds)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "rate(smartcity_inference_latency_seconds_sum[5m]) / rate(smartcity_inference_latency_seconds_count[5m])",
+          "legendFormat": "mean latency"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Requests per second",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(smartcity_requests_total[5m]))",
+          "legendFormat": "rps"
+        }
+      ]
+    }
+  ]
+}
