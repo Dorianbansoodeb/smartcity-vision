@@ -1,0 +1,9 @@
+# SmartCity Vision runtime dependencies (Phase 1).
+# Later phases add: fastapi, uvicorn, sqlalchemy, mlflow, prometheus-client, onnxruntime.
+
+ultralytics>=8.3.0        # YOLOv8 detection/tracking; pulls in torch + torchvision
+opencv-python>=4.10.0     # video I/O, geometry, drawing
+numpy>=1.26.0
+pandas>=2.2.0             # analytics/reporting (Phase 5)
+pydantic>=2.8.0           # validated configuration models
+PyYAML>=6.0.1             # YAML config files

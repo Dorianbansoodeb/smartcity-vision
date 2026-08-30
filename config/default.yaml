@@ -1,0 +1,58 @@
+# SmartCity Vision configuration.
+#
+# Every value below is validated against the Pydantic models in
+# src/smartcity_vision/utils/config.py; unknown keys are rejected rather than
+# silently ignored. Sections are added as the phases that consume them land, so
+# there are no options here that no code reads.
+#
+# Override any key at the command line, e.g.:
+#   python scripts/run_video.py --input data/input/clip.mp4 --set model.device=cpu
+
+model:
+  # Missing weights are downloaded on first run and cached at this path.
+  weights: models/yolov8n.pt
+  # auto -> CUDA if present, else Apple Silicon MPS, else CPU.
+  device: auto
+  confidence_threshold: 0.25
+  iou_threshold: 0.45
+  image_size: 640  # must be a multiple of the YOLOv8 stride (32)
+  max_detections: 300
+  # Run one throwaway inference before the loop so lazy GPU/MPS initialisation
+  # is not charged to the first frame's measured latency.
+  warmup: true
+  target_classes:
+    - car
+    - truck
+    - bus
+    - motorcycle
+    - bicycle
+    - person
+
+video:
+  # File path, webcam index ("0"), or stream URL ("rtsp://host/stream").
+  source: data/input/traffic.mp4
+  loop: false
+  frame_skip: 0     # 0 processes every frame; 2 processes every 3rd frame
+  max_frames: null  # null = run to the end of the source
+  display: false    # live preview window; needs a desktop session
+
+output:
+  directory: data/output
+  write_annotated_video: true
+  annotated_video_name: annotated_video.mp4
+  video_codec: mp4v
+  fallback_fps: 25.0  # used when a source reports no frame rate
+
+visualization:
+  box_thickness: 2
+  font_scale: 0.5
+  show_labels: true
+  show_confidence: true
+  show_hud: true
+  # Optional per-class BGR overrides; unlisted classes get a stable hashed colour.
+  class_colors: {}
+
+logging:
+  level: INFO
+  file: null  # e.g. data/output/run.log
+  progress_every_frames: 50
