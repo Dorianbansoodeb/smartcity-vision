@@ -21,6 +21,8 @@ models/*
 *.onnx
 mlruns/
 mlartifacts/
+mlflow.db
+*.db
 
 # Data (inputs are large, outputs are generated)
 data/input/*
