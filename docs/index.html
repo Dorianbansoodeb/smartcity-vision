@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SmartCity Vision — live demo</title>
+  <meta name="description" content="YOLOv8 traffic-camera analytics: tracked objects, unique counts, and measured latency from a real run." />
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #141a22;
+      --line: #243041;
+      --text: #e6edf3;
+      --muted: #8b9bb4;
+      --accent: #58a6ff;
+      --good: #3fb950;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, #1a2740 0%, var(--bg) 55%);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    main { max-width: 980px; margin: 0 auto; padding: 40px 20px 72px; }
+    .kicker { color: var(--accent); font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; }
+    h1 { font-size: clamp(28px, 4vw, 42px); margin: 8px 0 12px; letter-spacing: -0.03em; }
+    .lede { color: var(--muted); max-width: 62ch; margin: 0 0 28px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 28px; }
+    a.btn {
+      display: inline-block;
+      padding: 10px 14px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    a.primary { background: var(--accent); color: #041018; }
+    a.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+    .stage {
+      background: #000;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .stage img { display: block; width: 100%; height: auto; }
+    .caption { color: var(--muted); font-size: 13px; margin: 10px 0 28px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .card .label { color: var(--muted); font-size: 12px; }
+    .card .value { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; }
+    .card .note { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    h2 { margin: 36px 0 10px; font-size: 20px; }
+    ul { color: var(--muted); padding-left: 18px; }
+    code { color: var(--accent); font-size: 13px; }
+    footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
+    .ok { color: var(--good); }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="kicker">Measured demo · not a mock</p>
+    <h1>SmartCity Vision</h1>
+    <p class="lede">
+      YOLOv8 + ByteTrack on a public parking-lot clip. Every number on this page
+      came from running the pipeline — detections, unique counts, crossings, and latency.
+    </p>
+    <div class="actions">
+      <a class="btn primary" href="https://github.com/Dorianbansoodeb/smartcity-vision">GitHub repo</a>
+      <a class="btn ghost" href="https://github.com/Dorianbansoodeb/smartcity-vision#quickstart">Run it locally</a>
+    </div>
+
+    <div class="stage">
+      <img src="images/demo.gif" alt="Annotated traffic video with bounding boxes, track IDs, and unique counts" />
+    </div>
+    <p class="caption">
+      Annotated output from the real run: class, track ID, confidence, unique totals.
+      Clip: Intel IoT DevKit <code>person-bicycle-car-detection.mp4</code>, 647 frames at 768×432.
+    </p>
+
+    <div class="grid">
+      <div class="card">
+        <div class="label">Detections</div>
+        <div class="value">344</div>
+        <div class="note">boxes drawn across the clip</div>
+      </div>
+      <div class="card">
+        <div class="label">Unique objects</div>
+        <div class="value">10</div>
+        <div class="note">2 bikes · 3 cars · 5 people</div>
+      </div>
+      <div class="card">
+        <div class="label">Line crossings</div>
+        <div class="value">3</div>
+        <div class="note">lot_midline · A→B</div>
+      </div>
+      <div class="card">
+        <div class="label">MPS throughput</div>
+        <div class="value">47.2</div>
+        <div class="note">fps median, ByteTrack</div>
+      </div>
+    </div>
+
+    <h2>What this is showing</h2>
+    <ul>
+      <li>Track IDs persist (mean 29.7 frames/track, 0.98 continuity on this clip).</li>
+      <li>Unique counting is keyed on identity, not boxes — 344 detections collapse to 10 objects.</li>
+      <li>Peak congestion on this clip was <span class="ok">LOW</span>. Mean speed 81.5 px/s, uncalibrated.</li>
+      <li>ONNX Runtime was slower on the mean than PyTorch on CPU (39.7 vs 29.7 ms) and tighter on the p95. That measurement is in the repo.</li>
+    </ul>
+
+    <h2>This is a static replay</h2>
+    <p class="lede">
+      GitHub Pages cannot run YOLO in your browser. The live analyzer is
+      <code>python scripts/run_video.py</code> in the repo, or the FastAPI app on
+      <code>localhost:8000/docs</code>. Precision, recall, and mAP are not quoted —
+      this clip has no ground-truth labels.
+    </p>
+
+    <footer>
+      Run <code>d7ba019b5f8d4dcba13fc1d5ffa3bb8f</code> ·
+      <a href="https://github.com/Dorianbansoodeb/smartcity-vision/blob/main/MODEL_CARD.md" style="color: var(--accent)">Model card</a>
+    </footer>
+  </main>
+</body>
+</html>
